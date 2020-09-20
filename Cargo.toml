@@ -11,14 +11,19 @@ keywords = ["cli", "crypto", "cryptography", "html", "wasm"]
 categories = ["command-line-utilities", "cryptography"]
 edition = "2018"
 
+[features]
+default = ["decrypt"]
+decrypt = ["soup"]
+
 [dependencies]
 atty            = { version = "0.2" }
 base64          = { version = "0.12" }
 clap            = { version = "2.33" }
-handlebars      = { version = "3.4" }
 crypt2web-core  = { path = "crypt2web-core" }
+handlebars      = { version = "3.4" }
 rpassword       = { version = "5.0" }
 serde           = { version = "1.0", features = ["derive"] }
+soup            = { version = "0.5", optional = true }
 tree_magic_mini = { version = "1.0" }
 
 [workspace]

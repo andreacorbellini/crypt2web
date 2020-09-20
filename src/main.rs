@@ -53,8 +53,33 @@ macro_rules! fail {
     })
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum Mode {
+    Encrypt,
+    Decrypt,
+}
+
+impl Mode {
+    const fn is_supported(&self) -> bool {
+        match self {
+            Self::Encrypt => true,
+            Self::Decrypt => cfg!(feature = "decrypt"),
+        }
+    }
+}
+
+impl fmt::Display for Mode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Encrypt => write!(f, "Encryption"),
+            Self::Decrypt => write!(f, "Decryption"),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Options {
+    mode: Mode,
     verbose: bool,
     input: Option<File>,
     output: Option<File>,
@@ -105,7 +130,17 @@ fn parse_args() -> Options {
                            .short("v")
                            .long("verbose")
                            .help("Show verbose log messages"))
+                      .arg(Arg::with_name("decrypt")
+                           .short("d")
+                           .long("decrypt")
+                           .help("Decrypt the content of an encrypted file"))
                       .get_matches();
+
+    let mode = if matches.is_present("decrypt") { Mode::Decrypt } else { Mode::Encrypt };
+
+    if !mode.is_supported() {
+        fail!("{} is not supported by this {} build!", mode, NAME);
+    }
 
     let input = matches.value_of("input")
                        .map(open_file);
@@ -115,7 +150,7 @@ fn parse_args() -> Options {
 
     let password = matches.value_of("password-file")
                           .map(read_password)
-                          .unwrap_or_else(prompt_password);
+                          .unwrap_or_else(|| prompt_password(mode));
 
     let mime_type = matches.value_of("mime-type")
                            .map(|s| s.to_owned());
@@ -130,6 +165,7 @@ fn parse_args() -> Options {
     let verbose = matches.is_present("verbose");
 
     Options {
+        mode,
         verbose,
         input,
         output,
@@ -171,16 +207,21 @@ fn read_password<P: AsRef<Path> + fmt::Display>(path: P) -> String {
     password
 }
 
-fn prompt_password() -> String {
+fn prompt_password(mode: Mode) -> String {
     fn prompt(prompt: &str) -> String {
         rpassword::prompt_password_stderr(prompt)
                   .unwrap_or_else(|err| fail!("Failed to read password: {}", err))
     }
+
     let password = prompt("Password: ");
-    let repeat = prompt("Re-enter password: ");
-    if password != repeat {
-        fail!("Passwords don't match");
+
+    if mode == Mode::Encrypt {
+        let repeat = prompt("Re-enter password: ");
+        if password != repeat {
+            fail!("Passwords don't match");
+        }
     }
+
     password
 }
 
@@ -230,6 +271,50 @@ fn render(opts: &Options, ciphertext: &str) {
       .unwrap_or_else(|err| fail!("Failed to render template: {}", err))
 }
 
+fn encrypt(opts: &Options, content: &[u8]) {
+    let mime_type = opts.mime_type.as_deref()
+                                  .unwrap_or_else(|| guess_mime(content));
+    log!("Using MIME type: {}{}", mime_type,
+         if opts.mime_type.is_some() { "" } else { " (detected)" });
+
+    let ciphertext = crypt2web_core::encrypt(&opts.password, content, &mime_type);
+    render(&opts, &base64::encode(ciphertext));
+}
+
+#[cfg(feature = "soup")]
+fn extract_ciphertext(content: &[u8]) -> Vec<u8> {
+    use soup::*;
+
+    let content = std::str::from_utf8(content)
+                           .unwrap_or_else(|err| fail!("Cannot parse HTML content: {}", err));
+    let soup = Soup::new(content);
+    let tag = soup.tag("script")
+                  .attr("id", "ciphertext")
+                  .find()
+                  .unwrap_or_else(|| fail!("Ciphertext not found"));
+    base64::decode(&tag.text())
+           .unwrap_or_else(|err| fail!("Cannot decode base64 ciphertext: {}", err))
+}
+
+#[cfg(not(feature = "decrypt"))]
+fn decrypt(_opts: &Options, _content: &[u8]) {
+    unimplemented!()
+}
+
+#[cfg(feature = "decrypt")]
+fn decrypt(opts: &Options, content: &[u8]) {
+    let content = extract_ciphertext(content);
+
+    let (cleartext, mime_type) = crypt2web_core::decrypt(&opts.password, &content)
+                                                .unwrap_or_else(|err| fail!("Cannot decrypt content: {}", err));
+    log!("MIME type: {}", mime_type);
+
+    match opts.output.as_ref() {
+        Some(mut file) => file.write_all(&cleartext),
+        None           => std::io::stdout().write_all(&cleartext),
+    }.unwrap_or_else(|err| fail!("Failed to write output: {}", err))
+}
+
 fn main() {
     let opts = parse_args();
     if opts.verbose {
@@ -237,11 +322,8 @@ fn main() {
     }
 
     let content = read_content(opts.input.as_ref());
-    let mime_type = opts.mime_type.as_deref()
-                                  .unwrap_or_else(|| guess_mime(&content));
-    log!("Using MIME type: {}{}", mime_type,
-         if opts.mime_type.is_some() { "" } else { " (detected)" });
-
-    let ciphertext = crypt2web_core::encrypt(&opts.password, &content, &mime_type);
-    render(&opts, &base64::encode(ciphertext));
+    match opts.mode {
+        Mode::Encrypt => encrypt(&opts, &content),
+        Mode::Decrypt => decrypt(&opts, &content),
+    }
 }
