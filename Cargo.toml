@@ -1,0 +1,29 @@
+[package]
+name = "crypt2web"
+version = "0.1.0"
+authors = ["Andrea Corbellini <corbellini.andrea@gmail.com>"]
+license = "Apache-2.0"
+description = "Tool for encrypting content that can be decrypted in a web browser"
+readme = "README.md"
+homepage = "https://github.com/andreacorbellini/crypt2web"
+repository = "https://github.com/andreacorbellini/crypt2web"
+keywords = ["cli", "crypto", "cryptography", "html", "wasm"]
+categories = ["command-line-utilities", "cryptography"]
+edition = "2018"
+
+[dependencies]
+atty            = { version = "0.2" }
+base64          = { version = "0.12" }
+clap            = { version = "2.33" }
+handlebars      = { version = "3.4" }
+crypt2web-core  = { path = "crypt2web-core" }
+rpassword       = { version = "5.0" }
+serde           = { version = "1.0", features = ["derive"] }
+tree_magic_mini = { version = "1.0" }
+
+[workspace]
+members = ["crypt2web-core"]
+exclude = ["crypt2web-wasm"]
+
+[profile.release]
+lto = true

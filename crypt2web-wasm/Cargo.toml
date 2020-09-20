@@ -1,0 +1,28 @@
+[package]
+name = "crypt2web-wasm"
+version = "0.1.0"
+authors = ["Andrea Corbellini <corbellini.andrea@gmail.com>"]
+license = "Apache-2.0"
+description = "Tool for encrypting content that can be decrypted in a web browser (WASM bindings)"
+readme = "../README.md"
+homepage = "https://github.com/andreacorbellini/crypt2web"
+repository = "https://github.com/andreacorbellini/crypt2web"
+keywords = ["crypto", "cryptography", "wasm"]
+categories = ["cryptography"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["wee_alloc"]
+
+[dependencies]
+js-sys         = { version = "0.3" }
+crypt2web-core = { path = "../crypt2web-core" }
+wasm-bindgen   = { version = "0.2, <= 0.2.65" }
+wee_alloc      = { version = "0.4", optional = true }
+
+[profile.release]
+opt-level = "s"
+lto = true
