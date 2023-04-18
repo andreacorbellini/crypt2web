@@ -19,7 +19,8 @@ default = ["wee_alloc"]
 
 [dependencies]
 crypt2web-core = { path = "../crypt2web-core" }
-js-sys         = { version = "0.3" }
+getrandom      = { version = "0.2", features = ["js"] }
+js-sys         = { version = "0.3, >= 0.3.61" }
 wasm-bindgen   = { version = "0.2" }
 wee_alloc      = { version = "0.4", optional = true }
 

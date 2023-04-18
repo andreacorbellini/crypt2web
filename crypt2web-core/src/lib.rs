@@ -323,13 +323,13 @@ mod tests {
 
         fn random_bytes(min_size: usize, max_size: usize) -> Vec<u8> {
             let mut rng = thread_rng();
-            let size = rng.gen_range(min_size, max_size);
+            let size = rng.gen_range(min_size..max_size);
             (0..size).map(|_| rng.gen::<u8>()).collect()
         }
 
         fn random_string(min_size: usize, max_size: usize) -> String {
             let mut rng = thread_rng();
-            let size = rng.gen_range(min_size, max_size);
+            let size = rng.gen_range(min_size..max_size);
             (0..size).map(|_| rng.gen::<char>()).collect()
         }
 
@@ -339,11 +339,11 @@ mod tests {
             }
 
             let mut rng = thread_rng();
-            let rounds = rng.gen_range(1, 1024);
+            let rounds = rng.gen_range(1..1024);
 
             for _ in 0..rounds {
-                let index = rng.gen_range(0, bytes.len());
-                let bit = rng.gen_range(0, 8);
+                let index = rng.gen_range(0..bytes.len());
+                let bit = rng.gen_range(0..8);
                 bytes[index] ^= 1 << bit;
             }
         }
