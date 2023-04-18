@@ -18,9 +18,9 @@ crate-type = ["cdylib", "rlib"]
 default = ["wee_alloc"]
 
 [dependencies]
-js-sys         = { version = "0.3" }
 crypt2web-core = { path = "../crypt2web-core" }
-wasm-bindgen   = { version = "0.2, <= 0.2.65" }
+js-sys         = { version = "0.3" }
+wasm-bindgen   = { version = "0.2" }
 wee_alloc      = { version = "0.4", optional = true }
 
 [profile.release]
