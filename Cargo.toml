@@ -24,7 +24,7 @@ handlebars      = { version = "3.4" }
 rpassword       = { version = "5.0" }
 serde           = { version = "1.0", features = ["derive"] }
 soup            = { version = "0.5", optional = true }
-tree_magic_mini = { version = "1.0" }
+tree_magic_mini = { version = "3.0" }
 
 [workspace]
 members = ["crypt2web-core"]
