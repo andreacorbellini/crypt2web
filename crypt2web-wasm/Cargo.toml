@@ -9,7 +9,7 @@ homepage = "https://github.com/andreacorbellini/crypt2web"
 repository = "https://github.com/andreacorbellini/crypt2web"
 keywords = ["crypto", "cryptography", "wasm"]
 categories = ["cryptography"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

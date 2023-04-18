@@ -9,7 +9,7 @@ homepage = "https://github.com/andreacorbellini/crypt2web"
 repository = "https://github.com/andreacorbellini/crypt2web"
 keywords = ["cli", "crypto", "cryptography", "html", "wasm"]
 categories = ["command-line-utilities", "cryptography"]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["decrypt"]
