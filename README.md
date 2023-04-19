@@ -7,13 +7,12 @@ Crypt2web encrypts your files using a password and produces web pages that can b
 * [An encrypted picture](http://andreacorbellini.github.io/crypt2web/examples/picture.html) (password: `banana`)
 * [An encrypted PDF file](http://andreacorbellini.github.io/crypt2web/examples/pdf.html) (password: `cherry`)
 
-Crypt2web uses modern ciphers and algorithms: [ChaCha20] and [Poly1305] for encryption, and [PBKDF2] with [SHA-256] for key derivation.
+Crypt2web uses modern ciphers and algorithms: [ChaCha20] and [Poly1305] for encryption, and [Argon2] for key derivation.
 
 [WebAssembly]: https://webassembly.org/
 [ChaCha20]: https://en.wikipedia.org/wiki/ChaCha20
 [Poly1305]: https://en.wikipedia.org/wiki/Poly1305
-[PBKDF2]: https://en.wikipedia.org/wiki/PBKDF2
-[SHA-256]: https://en.wikipedia.org/wiki/SHA-2
+[Argon2]: https://en.wikipedia.org/wiki/Argon2
 
 ## Installation
 

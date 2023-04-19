@@ -24,15 +24,14 @@
 //! modern web browser. These web pages are self-contained (no external scripts or dependencies) and make use of
 //! WebAssembly for fast decryption operations.
 //!
-//! Crypt2web uses [ChaCha20] and [Poly1305] for encryption, and [PBKDF2] with [SHA-256] for key derivation.
+//! Crypt2web uses [ChaCha20] and [Poly1305] for encryption, and [Argon2] for key derivation.
 //!
 //! This package contains the core functionality used by both the command line client and the WebAssembly client.
 //!
 //! [WebAssembly]: https://webassembly.org/
 //! [ChaCha20]: https://en.wikipedia.org/wiki/ChaCha20
 //! [Poly1305]: https://en.wikipedia.org/wiki/Poly1305
-//! [PBKDF2]: https://en.wikipedia.org/wiki/PBKDF2
-//! [SHA-256]: https://en.wikipedia.org/wiki/SHA-2
+//! [Argon2]: https://en.wikipedia.org/wiki/Argon2
 //!
 //! # Example
 //!
@@ -51,16 +50,14 @@
 //! assert_eq!(decrypted_mime_type, mime_type);
 //! ```
 
+use argon2::Argon2;
 use chacha20poly1305::ChaCha20Poly1305;
 use chacha20poly1305::Key;
 use chacha20poly1305::KeyInit;
 use chacha20poly1305::Nonce;
 use chacha20poly1305::Tag;
 use chacha20poly1305::aead::AeadInPlace;
-use hmac::Hmac;
-use pbkdf2::pbkdf2;
 use rand::Rng;
-use sha2::Sha256;
 use std::error::Error;
 use std::fmt;
 use std::io::Read;
@@ -72,7 +69,9 @@ const CONTENT_LEN_SIZE: usize = 8;
 
 const HEADER_SIZE: usize = SALT_SIZE + NONCE_SIZE + TAG_SIZE + CONTENT_LEN_SIZE;
 
-const PBKDF2_ROUNDS: u32 = 65536;
+const ARGON2_M_COST: u32 = 19_456u32;
+const ARGON2_P_COST: u32 = 1u32;
+const ARGON2_T_COST: u32 = 2u32;
 
 /// Error returned by [`decrypt`].
 ///
@@ -120,7 +119,15 @@ impl Error for DecryptError {
 
 fn derive_key(salt: &[u8], password: &str) -> Key {
     let mut key = [0u8; 32];
-    pbkdf2::<Hmac<Sha256>>(password.as_bytes(), salt, PBKDF2_ROUNDS, &mut key);
+    let password = password.as_bytes();
+    let params = argon2::Params::new(ARGON2_M_COST,
+                                     ARGON2_T_COST,
+                                     ARGON2_P_COST,
+                                     Some(key.len()))
+                                .expect("failed to instantiate argon2 params");
+    Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params)
+           .hash_password_into(password, salt, &mut key)
+           .expect("failed to derive encryption key using argon2");
     *Key::from_slice(&key)
 }
 
@@ -194,9 +201,9 @@ pub fn encrypt(password: &str, content: &[u8], mime_type: &str) -> Vec<u8> {
 /// ```
 /// use crypt2web_core::decrypt;
 ///
-/// let encrypted = base64::decode("qdmFh7n3FU9MWtHjNi2m7HCg4ETTULm\
-///                                 Z1hyRHAjINt7M0L7z+6Z8RuhjQoMGAA\
-///                                 AAAAAAAGDCrclKMbJG2bXf3fLng/Q=")
+/// let encrypted = base64::decode("6JM4NfOYE7TwGJOhAHsNeEU7dSMr7mi\
+///                                 8qg9HBDMo6TYLeWB0fcwcq2OQjxcGAA\
+///                                 AAAAAAAJUgqaie4u0lSDeXVXhzRFk=")
 ///                        .unwrap();
 ///
 /// let (content, mime_type) = decrypt("password", &encrypted).expect("decryption failed");
@@ -404,7 +411,7 @@ mod tests {
 
         #[test]
         fn blob_0() {
-            let blob = base64::decode("79YoeJDZDVye6zY/XZgmxX4wICmHbXwSgPVoWrxPdHrCgf7jVbbavuqMJMQAAAAAAAAAAA==")
+            let blob = base64::decode("JI3jRjOYcBMbf9cpMr8Vfkv+bdtiQ4+NIUmcdjVaxOm1WwNauSK6zX01PVkAAAAAAAAAAA==")
                               .expect("base64 decoding failed");
             let (plain, mime) = decrypt("", &blob).expect("decrypt failed");
             assert_eq!(plain, b"");
@@ -413,7 +420,7 @@ mod tests {
 
         #[test]
         fn blob_1() {
-            let blob = base64::decode("DOQtKyOnD/DuinMI8TSpKRxK6aAhpxEdr34oFP84bFv6/Nt9e2DjQGdIZA8AAAAAAAAAAA==")
+            let blob = base64::decode("dUZ6of7ZHvquWWYZ/jTXb+vQvvOQlgR5/m2mvjbt5f4fSfnEfiJqhoMoPcAAAAAAAAAAAA==")
                               .expect("base64 decoding failed");
             let (plain, mime) = decrypt("s3cret", &blob).expect("decrypt failed");
             assert_eq!(plain, b"");
@@ -422,8 +429,8 @@ mod tests {
 
         #[test]
         fn blob_2() {
-            let blob = base64::decode("W9nEuXBXkmXa7/x3VLtkOYQLGukwjMwnKCk71X/MzEEbPxeV0clFnwTTKQsFAAAAAAAAAK+\
-                                       atDEr")
+            let blob = base64::decode("zDGY0IDlAfBiNtrwvvh4mi/NJ6ENkdHSiIoXHr5d9Ng7BIECWRVPgyyvQH8FAAAAAAAAAF\
+                                       1k9N5N")
                               .expect("base64 decoding failed");
             let (plain, mime) = decrypt("pass", &blob).expect("decrypt failed");
             assert_eq!(plain, b"hello");
@@ -432,8 +439,8 @@ mod tests {
 
         #[test]
         fn blob_3() {
-            let blob = base64::decode("v2s+jmPl9rveRnnM2l8JDsiPeU663syzgbfsA4izeFWn+P4Bfuy+1KVI2mAAAAAAAAAAAH\
-                                       1KtJSCmzXlXw==")
+            let blob = base64::decode("9S2PnnjRXSPDgr/zuaXv7I0XlhQ2FTkjKIS2TVRsi7hVdLKY57E8Xjh4itQAAAAAAAAAAL\
+                                       y8fW5pnW1ImA==")
                               .expect("base64 decoding failed");
             let (plain, mime) = decrypt("word", &blob).expect("decrypt failed");
             assert_eq!(plain, b"");
@@ -442,8 +449,8 @@ mod tests {
 
         #[test]
         fn blob_4() {
-            let blob = base64::decode("SjAKBzic/Jd3P4j7iN/RDDpfOPqrri+lQLdgNLaKIruh0x37zi0CKtJ85o0nAAAAAAAAAE\
-                                       6WDfRzse19lCn8YFaVEO+uNYBMlY9AYj/hhJvug4KgvbwS7BFrrUknwE8BsaktORc=")
+            let blob = base64::decode("zez5of38mMxk1ytjnPZ0ntbUt2Hu+LbLgPhAmK6HvC31u4FbbzV2heRFDaAnAAAAAAAAAB\
+                                       ih+ldODbhNKgEBWUhOAlfLjtZcSR9t2A1Zm4OCVa8OgwLALea8jXuHGcZ7wpPlWjU=")
                               .expect("base64 decoding failed");
             let (plain, mime) = decrypt("🍕🍨🍉", &blob).expect("decrypt failed");
             assert_eq!(plain[..], b"This is protected by a Unicode password"[..]);
@@ -452,13 +459,13 @@ mod tests {
 
         #[test]
         fn blob_5() {
-            let blob = base64::decode("0YkcBHYlmlZqTncti7j/9TySdeHUPTiodaB14VVPbnn7MixaBpnWRz7cYo0AAQAAAAAAAB\
-                                       8ORTPv1/qZTRE/XzYdZjGp3JmArvYr6wCmWXhrfKMKCTK0Itq6rDifT9prhfnxig5+MHo4\
-                                       PJQOGc8sCVKogyafWTGm5bG/kYf586vdNPoadQlpa/EN0LYRuGOZ0uljvF2ptMBxjwS2Or\
-                                       q3dSfVCJUgyNH1bhN2coISqreB03YAllxpSMiMwzjqBL8x0B7oBH+gnwAlaCIUlrjBpoOs\
-                                       kULgVl+Dl7pl7EzhtQN8XZwQP3aUNQvSFtQLbuIO5LNd7Q5yrP/dZH5a5fVZEQtC3SwlMQ\
-                                       5iW1BP+rNhuDMhfaEazgn0AZZFNsES73+rvA8VX9iSuYVJa3ptftgXU900TLRR3R5xz/sc\
-                                       6aI=")
+            let blob = base64::decode("PLmr18U0at4IW7YJRW2aS+pX26XCLBlaP2ZGyVtgAZTDqb56jjwdC+vm2DEAAQAAAAAAAE\
+                                       9KW9RNnWGvoNXd4w1vtgNmES1mj4RaGMdhEbloPfoae2cr5doU1PtLIYdGaqBQdjGa9IE9\
+                                       yqiWVP49644fQcso+X47qLp9j7N7YWSRuuxzMB/l0oA66yJlo2kCu48W+dqlauh0hp1aK4\
+                                       JPjxhdavUwYaXg53hcts4yZl1oSATgE9+8SVTCzmtBWJ3em5e3ZScCXW8jDD9Yw/QjBS+m\
+                                       ymLgTs9KWAuI1saj/6LV1FX54MEHwNAl0SMHc58hEP1O9yh4Aib7noIWVXgPltNvBLB69s\
+                                       Zx7oKDAOYXshnX+ANHh51uT3WuF3LyPj1/IPfbYs76w8SdRmoEG6/lxjqn8X0lqL0i2Jxg\
+                                       pIw=")
                               .expect("base64 decoding failed");
             let (plain, mime) = decrypt("Some Password", &blob).expect("decrypt failed");
             assert_eq!(plain, (0..=std::u8::MAX).collect::<Vec<u8>>());
@@ -467,27 +474,27 @@ mod tests {
 
         #[test]
         fn blob_6() {
-            let blob = base64::decode("oC4JKUIFjsJHfWgl//3JaB2fXjKRmUT/ZowRNBasc2/nYFjSXV0kU8O3+2kABAAAAAAAAF\
-                                       MK/JqB56+7x4gu8jpotHgV/9KJcI9ZxCM07ZDrImI8W/esxU0JqVzF9f2QoiVAIwCTU81s\
-                                       Q+oq+9tBE/gAexsrux7A0Iq74NHxM/hXf3vKyARbhdBIi28dxdxjmNU2SfU3FqEhnp9+l2\
-                                       AsEXFWzLfDxiOKFy7QOvu6UA6kqwaIFioWFNRu2HNwxCdP8u5ZbLa/XKEU/5ifvSSz3q9J\
-                                       EN+ruLIz6MaMcV6BipAHZIHzJ1wmfxZ2kl1srmX90QG+FlVFRVFQ+HHWnhTkNGeU4hpzDi\
-                                       B+s+ZCjk5dqd+K5FNLKzp/1isGmxn4Ohor1+jOpqqE6PAKTbc1PGfgewpDKvTEKsPlZRlR\
-                                       2Vy8+YTeZajc9uQhEQ1/WV4BxFwVib0yOqogsVtQ5E1fmdyM9cPT2z+vwRLM5KOpWWfmYD\
-                                       nbOz/vynSLu639EvG2pjQATpD13tsYcZTyv1Tg4gw5ONFPtnfHbDFaWIRB4fG4NFpku4UZ\
-                                       gZzOD65noobfPqdGV4COA6gv/2R98XN6w8VQIuwkVtN1Lrwdv/5rBaQZHGR6/GfdpkDf67\
-                                       VKCQRX6pgtfK3UEK161DgjvIr+LSILIZPQlsvN5ZGd1EOFVh9R15EO2hocqOG2YgnyvB5y\
-                                       BTjflEUbuH6DM3AZ38ROA8ySwGXuV4UwhXsGAPYFDRi3y0chcR+a5MRHMDm6SpzTV1uFH5\
-                                       Zzsatz907N4YG5PG+72CQYVOfGmd1kKitTmBL46iW8cS69LXPXe9N541VXVX5ddCg/Ifcv\
-                                       26JbtN8ncCsa1Jifzkq9GQipHUONhcHbqKtmGa7bFRy1XI2qP6x0iQR2SIEH5kFKcoyeaD\
-                                       hd9pfEUL9sZfc2c+egSrcZPxq8V0+YCnY/o5pKu0O3H8QfMtPzUdUqp2FPZo5xPvtFSNx6\
-                                       BT+diQeeKFuYNxJeCQsXx9k7Dbt+8qcVzOgKQnq5SjPIjZmii140PaZDYwMG6lTtFWavuM\
-                                       FyJ3WFuTVWc5EH0cVk+TeLa8btTR1zgL0WBoQR/rqpnqhPrmdTHELob5UJ3r9GTgk0rWo7\
-                                       QMj++1NJkMTqypFQs0Rj9FNtpdpnudReFzXARLTTqdOJIfQiFOf7EF0Jjt3+3xTHbk051K\
-                                       Xrs8JE0oXUi7v+hpH0638Jytn3USzGMlE5ZjXCwtqKjfNON+8ZlnQqAuwPGV4SdhwpNXDv\
-                                       kC/X4qzjBueaEwUWFxaffz3C2N1AYJsIYHRjn4Dg+FfMfqFHY3lbaJPzSrtn+Bw1yvuTHH\
-                                       lhLlD10+ynhZ/ElAlpPZqtoAVo1qDiocgiiFjxgslt1jHCfT2dWL3eS8I3G1DLJejRWSL7\
-                                       GyOo4zkz2rmL4xaT+HnribBjvZ641stJDZrTJTYZRiAaFf9MPknchG1VAFi8pc2E/bE=")
+            let blob = base64::decode("ShpvQccyaIlukpjGkDq0LW3XdDqve0c1LVFwUFYKn0zILtcAZ5k3ilzYeyYABAAAAAAAAI\
+                                       dc4zaMd5w+PPweaeLB/k1NqDx1od+SiWL4VGxpaM2gO7Y7Uzdmj+k14iHMYD2gf/GNpxo+\
+                                       44yIWkAxRnUw45tLhKc5PBSqpZPDg9R9pwU1XTFGc39WW4tc2wDPJSv0bQ01kH5ChcR4YY\
+                                       pis3lrjgj2Xa168MRvUtWaIsFoDlw0Z5e6NS0fOAyzugkcSOLYJHJEI6GJ/OgSHuVc8Vwh\
+                                       +l4p+/mjOAPqGGurFsEQ6E5Bcc4PZq/FQ+ldDOihZgdttItM1Szq4XLa0BTFgfw8KatiRE\
+                                       mSqaVOsa9wmHvCgExadJI/hhYa6ADP0/KPFx3f0pZC2a5lR47rWQ5i+0UVodK72SPc7Ty8\
+                                       EDBk0a7mqtXCDoxECL6eV5/Y7QouEN2x09kCgBqAoU9JlcaDtRDQH6HbT1DkiwJE43gVJ4\
+                                       brKPX9wz5k77tDRGYJHjbzQxt2yF1IO7byffm5wgI1NWhrjUx+rNK4MWSaoG3PwJ4/MTsV\
+                                       HN6kNMuq/AAxOXVWYPXpJgtyMKJMNZ6uRQvseKf4sKR1RLJ4qgDGS9+vR5W9l2KqYJ7qoh\
+                                       ZjzoyRbetWquhSWFTXc5S/fHSkRrOCcocORPCS5731JUP4i2pbDz/z7r693VOhDqk1cMw2\
+                                       SCgiTFRFPrGBD9vkOKkODv20nI3R9Vo1TVQit9czw92DxJdIaimnJHQjh9GBN4h1IYxTRx\
+                                       6NaF9h3ColacQugH5H84gzSnmu3ZGSXMb+9HpGjmfKMJm1cs2yCM/plRR70zqun6TMRVaV\
+                                       lWWbo6h9aAGN8AOHClAMDpAaU1Zn5YMqWh4NpPiuDfeSLmIjiou9rcu+f/QniAkMPzplZF\
+                                       DHEjD4nRfsHdwF/0AAOmUP8ec9lLzJJ1ueanjW52q1ehlyNZ9TVK1Ybt++i99WRTkp508/\
+                                       eK/Ky61Czho2J7IeC8YBfrSQBc1huQ36Au+nmKYMW8VMhFFl8pvwN0vs88A5h/pO0FqRRW\
+                                       wqqPKjpzr9D8bHjAXWDOf3ekHc78ppg3WghL/jrL5/i9GYvcU6Ckv8qaJ7pg1pEWrZGXf4\
+                                       3D7PDK0bsJpGuT4050MSL2fw282OVxEpzLDRBlrtcYP6Y+TDJMVmfZufvXfPPEzS3d0O1e\
+                                       fBo0MMbaKGAHclxuQ/EhAYwZwV0K3R2fOt5voS48mRQlQHevT9vPyBJsT/1UGgyn6iw5Mw\
+                                       YslXT49DHI4LEconw/sC+1EekQs4gHW51V3ed7LHwWciLvX5apTXj++pw9Gvx9qK98f1gS\
+                                       AYAV12YLnZmlT+In8Itp8yN568ktwOU6FOLUiS/Q9bmnLg8FDvjas0QrZefvrd0plg6m4Q\
+                                       HqsIhpW+yeKkUFUpYExlvg58wM4jEPVA8qnF+Rimah63nJC3dKYppNaSOeztRu5TH6s=")
                               .expect("base64 decoding failed");
             let expected = base64::decode("TwEIoPHIDkZKcS5Ry0o2/DNZTUH/SV9IBmkSDwFuhWIU+exoYD6ArrNCJie0f7q8WF\
                                            0E/7rfnPkcMbD0MRCGixndluEVri2GzT/8muctBbAfh0w2N6Ug6Q13mUK0LuCQUZZY\
