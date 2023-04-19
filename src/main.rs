@@ -16,8 +16,8 @@
 #![warn(unreachable_pub)]
 #![warn(unused_qualifications)]
 
-use clap::App;
 use clap::Arg;
+use clap::ArgAction;
 use handlebars::Handlebars;
 use serde::Serialize;
 use std::fmt;
@@ -90,79 +90,81 @@ struct Options {
 }
 
 fn parse_args() -> Options {
-    let matches = App::new(NAME)
-                      .version(VERSION)
-                      .about(DESCRIPTION)
-                      .arg(Arg::with_name("input")
-                           .takes_value(true)
-                           .value_name("FILE")
-                           .help("Read the plaintext data to encrypt from FILE. Defaults to standard input"))
-                      .arg(Arg::with_name("output")
-                           .short("o")
-                           .long("output")
-                           .takes_value(true)
-                           .value_name("FILE")
-                           .help("Write the encrypted webpage to FILE. Defaults to standard output"))
-                      .arg(Arg::with_name("mime-type")
-                           .short("t")
-                           .long("mime-type")
-                           .takes_value(true)
-                           .value_name("MIME")
-                           .help("The MIME type of the content to encrypt"))
-                      .arg(Arg::with_name("password-file")
-                           .short("p")
-                           .long("password-file")
-                           .takes_value(true)
-                           .value_name("FILE")
-                           .help("Read the password from FILE. Only the first line of FILE is read. Trailing new \
-                                  line characters are ignored"))
-                      .arg(Arg::with_name("password-methods")
-                           .short("m")
-                           .long("password-methods")
-                           .takes_value(true)
-                           .value_name("METHOD")
-                           .multiple(true)
-                           .require_delimiter(true)
-                           .case_insensitive(true)
-                           .possible_values(&["prompt", "fragment"])
-                           .help("List of accepted input password methods, comma separated"))
-                      .arg(Arg::with_name("verbose")
-                           .short("v")
-                           .long("verbose")
-                           .help("Show verbose log messages"))
-                      .arg(Arg::with_name("decrypt")
-                           .short("d")
-                           .long("decrypt")
-                           .help("Decrypt the content of an encrypted file"))
-                      .get_matches();
+    let matches = clap::Command::new(NAME)
+                                .version(VERSION)
+                                .about(DESCRIPTION)
+                                .arg(Arg::new("input")
+                                     .action(ArgAction::Set)
+                                     .value_name("FILE")
+                                     .help("Read the plaintext data to encrypt from FILE. Defaults to standard input"))
+                                .arg(Arg::new("output")
+                                     .short('o')
+                                     .long("output")
+                                     .action(ArgAction::Set)
+                                     .value_name("FILE")
+                                     .help("Write the encrypted webpage to FILE. Defaults to standard output"))
+                                .arg(Arg::new("mime-type")
+                                     .short('t')
+                                     .long("mime-type")
+                                     .action(ArgAction::Set)
+                                     .value_name("MIME")
+                                     .help("The MIME type of the content to encrypt"))
+                                .arg(Arg::new("password-file")
+                                     .short('p')
+                                     .long("password-file")
+                                     .action(ArgAction::Set)
+                                     .value_name("FILE")
+                                     .help("Read the password from FILE. Only the first line of FILE is read. Trailing new \
+                                            line characters are ignored"))
+                                .arg(Arg::new("password-methods")
+                                     .short('m')
+                                     .long("password-methods")
+                                     .action(ArgAction::Append)
+                                     .value_name("METHOD")
+                                     .value_delimiter(',')
+                                     .ignore_case(true)
+                                     .value_parser(["prompt", "fragment"])
+                                     .help("List of accepted input password methods, comma separated"))
+                                .arg(Arg::new("verbose")
+                                     .short('v')
+                                     .long("verbose")
+                                     .action(ArgAction::SetTrue)
+                                     .help("Show verbose log messages"))
+                                .arg(Arg::new("decrypt")
+                                     .short('d')
+                                     .long("decrypt")
+                                     .action(ArgAction::SetTrue)
+                                     .help("Decrypt the content of an encrypted file"))
+                                .get_matches();
 
-    let mode = if matches.is_present("decrypt") { Mode::Decrypt } else { Mode::Encrypt };
+    let mode = if matches.get_flag("decrypt") { Mode::Decrypt } else { Mode::Encrypt };
 
     if !mode.is_supported() {
         fail!("{} is not supported by this {} build!", mode, NAME);
     }
 
-    let input = matches.value_of("input")
+    let input = matches.get_one::<String>("input")
                        .map(open_file);
 
-    let output = matches.value_of("output")
+    let output = matches.get_one::<String>("output")
                         .map(create_file);
 
-    let password = matches.value_of("password-file")
+    let password = matches.get_one::<String>("password-file")
                           .map(read_password)
                           .unwrap_or_else(|| prompt_password(mode));
 
-    let mime_type = matches.value_of("mime-type")
+    let mime_type = matches.get_one::<String>("mime-type")
                            .map(|s| s.to_owned());
 
-    let methods = matches.values_of("password-methods")
-                         .map(|v| v.collect::<Vec<&str>>())
-                         .unwrap_or_else(Vec::new);
+    let methods = matches.get_many::<String>("password-methods")
+                         .unwrap_or_default()
+                         .map(|s| s.as_str())
+                         .collect::<Vec<&str>>();
     let allow_all = methods.is_empty();
     let allow_prompt = allow_all || methods.contains(&"prompt");
     let allow_fragment = allow_all || methods.contains(&"fragment");
 
-    let verbose = matches.is_present("verbose");
+    let verbose = matches.get_flag("verbose");
 
     Options {
         mode,
