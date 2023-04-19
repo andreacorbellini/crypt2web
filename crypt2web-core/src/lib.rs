@@ -53,10 +53,10 @@
 
 use chacha20poly1305::ChaCha20Poly1305;
 use chacha20poly1305::Key;
+use chacha20poly1305::KeyInit;
 use chacha20poly1305::Nonce;
 use chacha20poly1305::Tag;
 use chacha20poly1305::aead::AeadInPlace;
-use chacha20poly1305::aead::NewAead;
 use hmac::Hmac;
 use pbkdf2::pbkdf2;
 use rand::Rng;
