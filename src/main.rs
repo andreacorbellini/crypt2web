@@ -211,7 +211,7 @@ fn read_password<P: AsRef<Path> + fmt::Display>(path: P) -> String {
 
 fn prompt_password(mode: Mode) -> String {
     fn prompt(prompt: &str) -> String {
-        rpassword::prompt_password_stderr(prompt)
+        rpassword::prompt_password(prompt)
                   .unwrap_or_else(|err| fail!("Failed to read password: {}", err))
     }
 

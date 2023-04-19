@@ -21,7 +21,7 @@ base64          = { version = "0.20" }
 clap            = { version = "4.2" }
 crypt2web-core  = { path = "crypt2web-core" }
 handlebars      = { version = "4.3" }
-rpassword       = { version = "5.0" }
+rpassword       = { version = "7.2" }
 serde           = { version = "1.0", features = ["derive"] }
 soup            = { version = "0.5", optional = true }
 tree_magic_mini = { version = "3.0" }
