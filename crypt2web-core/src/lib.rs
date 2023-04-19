@@ -172,7 +172,7 @@ pub fn encrypt(password: &str, content: &[u8], mime_type: &str) -> Vec<u8> {
     ciphertext.extend_from_slice(mime_type.as_bytes());
 
     let nonce = Nonce::from_slice(&nonce);
-    let tag = cipher.encrypt_in_place_detached(&nonce, b"", &mut ciphertext[HEADER_SIZE..])
+    let tag = cipher.encrypt_in_place_detached(nonce, b"", &mut ciphertext[HEADER_SIZE..])
                     .expect("encryption failed");
     ciphertext[SALT_SIZE + NONCE_SIZE..SALT_SIZE + NONCE_SIZE + TAG_SIZE].copy_from_slice(&tag);
 
@@ -250,7 +250,7 @@ pub fn decrypt(password: &str, mut ciphertext: &[u8]) -> Result<(Vec<u8>, String
 
     let nonce = Nonce::from_slice(&nonce);
     let tag = Tag::from_slice(&tag);
-    cipher.decrypt_in_place_detached(&nonce, b"", &mut plaintext, &tag)
+    cipher.decrypt_in_place_detached(nonce, b"", &mut plaintext, tag)
           .map_err(|_| DecryptError::InvalidPassword)?;
 
     let content_len = u64::from_le_bytes(content_len) as usize;

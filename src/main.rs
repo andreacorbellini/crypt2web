@@ -279,8 +279,8 @@ fn encrypt(opts: &Options, content: &[u8]) {
     log!("Using MIME type: {}{}", mime_type,
          if opts.mime_type.is_some() { "" } else { " (detected)" });
 
-    let ciphertext = crypt2web_core::encrypt(&opts.password, content, &mime_type);
-    render(&opts, &base64::encode(ciphertext));
+    let ciphertext = crypt2web_core::encrypt(&opts.password, content, mime_type);
+    render(opts, &base64::encode(ciphertext));
 }
 
 #[cfg(feature = "soup")]
@@ -294,7 +294,7 @@ fn extract_ciphertext(content: &[u8]) -> Vec<u8> {
                   .attr("id", "ciphertext")
                   .find()
                   .unwrap_or_else(|| fail!("Ciphertext not found"));
-    base64::decode(&tag.text())
+    base64::decode(tag.text())
            .unwrap_or_else(|err| fail!("Cannot decode base64 ciphertext: {}", err))
 }
 
