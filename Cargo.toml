@@ -17,7 +17,7 @@ decrypt = ["soup"]
 
 [dependencies]
 atty            = { version = "0.2" }
-base64          = { version = "0.12" }
+base64          = { version = "0.20" }
 clap            = { version = "2.33" }
 crypt2web-core  = { path = "crypt2web-core" }
 handlebars      = { version = "4.3" }

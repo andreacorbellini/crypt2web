@@ -19,5 +19,5 @@ rand             = { version = "0.8" }
 sha2             = { version = "0.9" }
 
 [dev-dependencies]
-base64           = { version = "0.12" }
+base64           = { version = "0.20" }
 itertools        = { version = "0.10" }
