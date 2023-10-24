@@ -18,4 +18,4 @@ rand             = { version = "0.8" }
 
 [dev-dependencies]
 base64           = { version = "0.20" }
-itertools        = { version = "0.10" }
+itertools        = { version = "0.11" }
